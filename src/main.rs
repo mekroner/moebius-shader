@@ -5,6 +5,7 @@ mod post_process;
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
+        .insert_resource(Msaa::Off)
         .add_plugins((
             DefaultPlugins,
             fly_cam::FlyCamPlugin,

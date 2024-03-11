@@ -1,11 +1,8 @@
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
-#import bevy_pbr::{
-    prepass_utils,
-    mesh_view_bindings::normal_prepass_texture,
-}
 
 @group(0) @binding(0) var screen_texture: texture_2d<f32>;
 @group(0) @binding(1) var texture_sampler: sampler;
+@group(0) @binding(3) var prepass_texture: texture_2d<f32>;
 
 struct PostProcessSettings {
     intensity: f32,
@@ -17,12 +14,10 @@ struct PostProcessSettings {
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     // Chromatic aberration strength
     let offset_strength = settings.intensity;
-    let sample_index = 0u;
-
-    let normal_prepass = normal_prepass_texture;
-    let normal = vec3(1.0);
-
-    return vec4(normal, 1.0);
+    let normal = textureSample(prepass_texture, texture_sampler, in.uv);
+    //let normal = textureLoad(prepass_texture, vec2<i32>(1,1), 4);
+    let out = normalize(normal.xyz * 2.0 - 1.0);
+    return vec4(out, 1.0);
 
     // Sample each color channel with an arbitrary shift
     // return vec4<f32>(

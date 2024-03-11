@@ -2,6 +2,7 @@ use bevy::{
     core_pipeline::{
         core_3d::graph::{Core3d, Node3d},
         fullscreen_vertex_shader::fullscreen_shader_vertex_state,
+        prepass::ViewPrepassTextures,
     },
     prelude::*,
     render::{
@@ -10,7 +11,7 @@ use bevy::{
         },
         render_graph::{RenderGraphApp, RenderLabel, ViewNode, ViewNodeRunner},
         render_resource::{
-            binding_types::{sampler, texture_2d, uniform_buffer}, BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries, CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState, MultisampleState, Operations, PipelineCache, PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor, RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages, ShaderType, TextureFormat, TextureSampleType
+            binding_types::{sampler, texture_2d, texture_2d_multisampled, uniform_buffer}, AsBindGroupShaderType, BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries, CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState, MultisampleState, Operations, PipelineCache, PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor, RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages, ShaderType, TextureFormat, TextureSampleType
         },
         renderer::RenderDevice,
         texture::BevyDefault,
@@ -72,13 +73,17 @@ pub struct PostProcessSettings {
 }
 
 impl ViewNode for PostProcessNode {
-    type ViewQuery = (&'static ViewTarget, &'static PostProcessSettings);
+    type ViewQuery = (
+        &'static ViewTarget,
+        &'static PostProcessSettings,
+        &'static ViewPrepassTextures,
+    );
 
     fn run<'w>(
         &self,
-        graph: &mut bevy::render::render_graph::RenderGraphContext,
+        _graph: &mut bevy::render::render_graph::RenderGraphContext,
         render_context: &mut bevy::render::renderer::RenderContext<'w>,
-        (view_target, _): bevy::ecs::query::QueryItem<'w, Self::ViewQuery>,
+        (view_target, _, prepass): bevy::ecs::query::QueryItem<'w, Self::ViewQuery>,
         world: &'w World,
     ) -> Result<(), bevy::render::render_graph::NodeRunError> {
         let post_process_pipline = world.resource::<PostProcessPipeline>();
@@ -93,6 +98,10 @@ impl ViewNode for PostProcessNode {
             return Ok(());
         };
 
+        let Some(normal_view) = prepass.normal_view() else {
+            return Ok(());
+        };
+
         let post_process = view_target.post_process_write();
 
         let bind_group = render_context.render_device().create_bind_group(
@@ -102,6 +111,7 @@ impl ViewNode for PostProcessNode {
                 post_process.source,
                 &post_process_pipline.sampler,
                 settings_binding.clone(),
+                normal_view,
             )),
         );
 
@@ -137,12 +147,15 @@ impl FromWorld for PostProcessPipeline {
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     sampler(SamplerBindingType::Filtering),
                     uniform_buffer::<PostProcessSettings>(false),
+                    texture_2d(TextureSampleType::Float { filterable: true }),
                 ),
             ),
         );
 
         let sampler = render_device.create_sampler(&SamplerDescriptor::default());
-        let shader = world.resource::<AssetServer>().load("shaders/post_processing.wgsl");
+        let shader = world
+            .resource::<AssetServer>()
+            .load("shaders/post_processing.wgsl");
 
         let pipeline_id = world
             .resource_mut::<PipelineCache>()
