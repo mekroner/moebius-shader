@@ -80,9 +80,9 @@ fn spawn_camera(mut cmds: Commands) {
             ..default()
         },
         FlyCam,
-        PostProcessSettings { intensity: 0.01 },
+        PostProcessSettings::default(),
         NormalPrepass,
-        // DepthPrepass,
+        DepthPrepass,
     ));
 }
 

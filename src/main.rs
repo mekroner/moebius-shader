@@ -1,10 +1,12 @@
-use bevy::{prelude::*, render::primitives::Sphere};
+use std::f32::consts::PI;
+
+use bevy::prelude::*;
 mod fly_cam;
 mod post_process;
 
 fn main() {
     App::new()
-        .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
+        .insert_resource(ClearColor(Color::rgb_u8(242, 208, 196)))
         .insert_resource(Msaa::Off)
         .add_plugins((
             DefaultPlugins,
@@ -13,7 +15,7 @@ fn main() {
         ))
         .add_systems(Startup, setup)
         .add_systems(Startup, spawn_light)
-        .add_systems(Update, apply_rotation) 
+        .add_systems(Update, apply_rotation)
         .run();
 }
 
@@ -35,8 +37,37 @@ fn setup(
     cmd.spawn((
         PbrBundle {
             mesh: meshes.add(Cuboid::default().mesh().scaled_by(Vec3::splat(3.))),
-            material: materials.add(Color::WHITE),
-            transform: Transform::from_xyz(0.0, 5.0, 0.0),
+            material: materials.add(Color::rgb_u8(89, 108, 217)),
+            transform: Transform::from_xyz(0.0, 2.0, 0.0),
+            ..default()
+        },
+        Rotates,
+    ));
+
+    // sphere
+    cmd.spawn((
+        PbrBundle {
+            mesh: meshes.add(
+                Sphere::default()
+                    .mesh()
+                    .ico(9)
+                    .unwrap()
+                    .scaled_by(Vec3::splat(3.0)),
+            ),
+            material: materials.add(Color::rgb_u8(132, 119, 217)),
+            transform: Transform::from_xyz(-5.0, 3.0, 0.0),
+            ..default()
+        },
+        Rotates,
+    ));
+
+    // Torus
+    cmd.spawn((
+        PbrBundle {
+            mesh: meshes.add(Torus::default()),
+            material: materials.add(Color::rgb_u8(217, 143, 170)),
+            transform: Transform::from_xyz(5.0, 3.0, 0.0)
+                .with_rotation(Quat::from_rotation_x(PI / 4.0)),
             ..default()
         },
         Rotates,

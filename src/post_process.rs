@@ -9,9 +9,16 @@ use bevy::{
         extract_component::{
             ComponentUniforms, ExtractComponent, ExtractComponentPlugin, UniformComponentPlugin,
         },
+        extract_resource::{ExtractResource, ExtractResourcePlugin},
+        render_asset::RenderAssets,
         render_graph::{RenderGraphApp, RenderLabel, ViewNode, ViewNodeRunner},
         render_resource::{
-            binding_types::{sampler, texture_2d, texture_2d_multisampled, uniform_buffer}, AsBindGroupShaderType, BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries, CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState, MultisampleState, Operations, PipelineCache, PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor, RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages, ShaderType, TextureFormat, TextureSampleType
+            binding_types::{sampler, texture_2d, texture_depth_2d, uniform_buffer},
+            AsBindGroup, BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries,
+            CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState, MultisampleState,
+            Operations, PipelineCache, PrimitiveState, RenderPassColorAttachment,
+            RenderPassDescriptor, RenderPipelineDescriptor, Sampler, SamplerBindingType,
+            SamplerDescriptor, ShaderStages, ShaderType, TextureFormat, TextureSampleType,
         },
         renderer::RenderDevice,
         texture::BevyDefault,
@@ -27,7 +34,12 @@ impl Plugin for PostProcessPlugin {
         app.add_plugins((
             ExtractComponentPlugin::<PostProcessSettings>::default(),
             UniformComponentPlugin::<PostProcessSettings>::default(),
-        ));
+            ExtractResourcePlugin::<PaperTexture>::default(),
+        ))
+        .add_systems(Startup, setup_texture);
+
+        // let texture = app.world.resource::<AssetServer>().load("textures/paper.png");
+        // app.insert_resource(PaperTexture { texture });
 
         let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
@@ -54,6 +66,11 @@ impl Plugin for PostProcessPlugin {
     }
 }
 
+fn setup_texture(mut cmd: Commands, assets: Res<AssetServer>) {
+    let texture = assets.load("textures/paper.png");
+    cmd.insert_resource(PaperTexture { texture });
+}
+
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 struct PostProcessLabel;
 
@@ -67,9 +84,21 @@ struct PostProcessPipeline {
     pipeline_id: CachedRenderPipelineId,
 }
 
-#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
+#[derive(Component, Clone, ExtractComponent, ShaderType)]
 pub struct PostProcessSettings {
     pub intensity: f32,
+}
+
+impl Default for PostProcessSettings {
+    fn default() -> Self {
+        Self { intensity: 1.0 }
+    }
+}
+
+#[derive(Resource, Clone, Deref, ExtractResource, AsBindGroup)]
+pub struct PaperTexture {
+    // #[texture(10)]
+    texture: Handle<Image>,
 }
 
 impl ViewNode for PostProcessNode {
@@ -102,6 +131,18 @@ impl ViewNode for PostProcessNode {
             return Ok(());
         };
 
+        let Some(depth_view) = prepass.depth_view() else {
+            return Ok(());
+        };
+
+        let paper_texture = world.resource::<PaperTexture>();
+        let Some(paper_view) = world
+            .resource::<RenderAssets<Image>>()
+            .get(&paper_texture.texture)
+        else {
+            return Ok(());
+        };
+
         let post_process = view_target.post_process_write();
 
         let bind_group = render_context.render_device().create_bind_group(
@@ -112,6 +153,8 @@ impl ViewNode for PostProcessNode {
                 &post_process_pipline.sampler,
                 settings_binding.clone(),
                 normal_view,
+                depth_view,
+                &paper_view.texture_view,
             )),
         );
 
@@ -147,6 +190,8 @@ impl FromWorld for PostProcessPipeline {
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     sampler(SamplerBindingType::Filtering),
                     uniform_buffer::<PostProcessSettings>(false),
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    texture_depth_2d(),
                     texture_2d(TextureSampleType::Float { filterable: true }),
                 ),
             ),
