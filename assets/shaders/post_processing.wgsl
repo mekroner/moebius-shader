@@ -132,12 +132,27 @@ fn invert(vec: vec4<f32>, cutoff: f32) -> vec4<f32> {
     );
 }
 
+fn mix4x1(a: vec4<f32>, b: f32, c: f32) -> vec4<f32> {
+    return vec4(
+        mix(a.x, b, c),
+        mix(a.y, b, c),
+        mix(a.z, b, c),
+        1.0
+    );
+}
+
+
+
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     let screen = textureSample(screen_texture, texture_sampler, in.uv);
-    let paper = grayscale(textureSample(paper_texture, texture_sampler, in.uv));
+    // paper
+    let paper_strength = 1.0;
+    let paper_inverse_strength = 0.4;
+    let paper = mix4x1(vec4(1.0), grayscale(textureSample(paper_texture, texture_sampler, in.uv)), paper_strength);
     let paper_invert = invert(textureSample(paper_texture, texture_sampler, in.uv), 0.6);
+
     let outline = vec4(1.0 - vec3(outline(in.uv)), 1.0);
-    return paper_invert + outline * paper;
+    return paper_invert * paper_inverse_strength + screen * outline * paper;
     //return sample;
 }

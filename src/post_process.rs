@@ -97,7 +97,6 @@ impl Default for PostProcessSettings {
 
 #[derive(Resource, Clone, Deref, ExtractResource, AsBindGroup)]
 pub struct PaperTexture {
-    // #[texture(10)]
     texture: Handle<Image>,
 }
 
